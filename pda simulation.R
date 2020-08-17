@@ -1,5 +1,6 @@
 library(fda)
 library(fda.usc)
+library(dplyr)
 
 # To differentiate more than 4 times, functions fdata2fd and fdata.deriv in fda.usc package are modified.
 fdata2fd <- function (fdataobj, type.basis = NULL, nbasis = NULL, nderiv = 0, 
@@ -218,10 +219,8 @@ RSQ.cv.error <- function(fdata., label, K, max.order, deriv.method="bspline", nb
                                   .export=c("fdata2fd", "fdata.deriv", "get.RSQ", "get.pw.const.beta")) %dopar% {
                                     train <- (1:n)[folds != i]
                                     # for each fold, train data is separated by its classes or groups
-                                    train.fdata <- fdata.
                                     train.class1 <- fdata.
                                     train.class2 <- fdata.
-                                    train.fdata$data <- fdata.$data[train,]
                                     train.class1$data <- fdata.$data[train[which(label[train] == class1)],]
                                     train.class2$data <- fdata.$data[train[which(label[train] == class2)],]
                                     val.fdata <- fdata.
@@ -234,11 +233,13 @@ RSQ.cv.error <- function(fdata., label, K, max.order, deriv.method="bspline", nb
                                     # calculate RSQs of each class for test data
                                     class1.RSQ <- get.RSQ(val.fdata, class1.beta, method=deriv.method, n.basis=nbasis)
                                     class2.RSQ <- get.RSQ(val.fdata, class2.beta, method=deriv.method, n.basis=nbasis)
-                                    RSQ.df <- data.frame(class1=class1.RSQ, class2=class2.RSQ)
+                                    RSQ.df <- data.frame(class1=class1.RSQ, class2=class2.RSQ, y=label)
                                     
                                     # classify validation data as one class with maximum RSQ value
-                                    pred <- as.factor(append(ifelse(apply(RSQ.df, 1, which.max) == 1,
-                                                                    class1, class2), c(class1, class2)))[1:sum(folds == i)]
+                                    logistic.fit <- glm(y~., data=RSQ.df[train,], family=binomial)
+                                    pi.hat <- predict(logistic.fit, newdata=RSQ.df[folds == i,], type="response")
+                                    pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1),
+                                                             c(class1, class2)))[1:sum(folds == i)]
                                     return(mean(pred != label[folds == i]))
                                   }
     print(paste("order ", " complete", sep=as.character(order)))
@@ -392,6 +393,132 @@ library(doParallel)
 nc <- detectCores()
 registerDoParallel(nc-1)
 
+# generate simulation data set.
+nfold <- 8
+err <- 0.1 # used 0.1 or 1
+mu <- 0    # used 0 or 1
+{set.seed(100)
+  data1 <- simul.data(list(cos1, sin1), 100, mu, error=err)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(cos3, sin3), 100, mu, error=err)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set1 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label1 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+
+# data set2.
+err <- 0.1 # used 0.1 or 1
+mu <- 0    # used 0 or 1
+{set.seed(100)
+  data1 <- simul.data(list(exp5), 100, mu, error=err)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(exp0.5), 100, mu, error=err)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set2 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label2 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+
+
+# data set3.
+err <- 0.1 # used 0.1 or 1
+mu <- 0    # used 0 or 1
+{set.seed(300)
+  data1 <- simul.data(list(exp0.25*cos1, exp0.25*sin1), 100, mu, error=err)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(exp0.5*cos3, exp0.5*sin3), 100, mu, error=err)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set3 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label3 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+
+# data set4.
+err <- 0.1 # used 0.1 or 1
+mu <- 0    # used 0 or 1
+{set.seed(700)
+  data1 <- simul.data(list(cos1, sin1), 100, mu, error=err)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(cos1.05, sin1.05), 100, mu, error=err)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set4 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label4 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+
+# data set5.
+err <- 0.1 # used 0.1 or 1
+mu <- 0    # used 0 or 1
+{set.seed(100)
+  data1 <- simul.data(list(x.poly3), 100, mu, error=err)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(3*cos3, 3*sin3), 100, mu, error=err)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set5 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label5 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+
+# PDA after smoothing.
+smooth.fdata <- function(fdata., basis, lambda, argvals.=NULL) {
+  # returns smoothed functional data.
+  # basis : spline basis used for smoothing the functional data.
+  # lambda : roughness penalty parameter for smoothing the functional data.
+  # argvals. : sample points of out put. If argvals=NULL, sample points is same with fdata..
+  library(fda)
+  library(fda.usc)
+  l <- lambda
+  n <- nrow(fdata.$data)
+  if (is.null(argvals.)) {
+    argvals. <- fdata.$argvals
+  }
+  basis.mat <- getbasismatrix(argvals., basis) # returns the matrix of values of each basis at sample points.
+  fd0 <- fd(basisobj=basis)
+  basis.fdPar <- fdPar(fd0, lambda=l)
+  fdata.smoothed <- smooth.basis(argvals., t(fdata.$data), basis.fdPar)$fd # coefficients of each basis after smoothing.
+  result <- matrix(0, n, length(argvals.))
+  
+  # convert the coefficients of each basis to the values at sample points.
+  for (i in 1:n) {
+    result[i,] <- apply(t(basis.mat) * fdata.smoothed$coefs[,i], 2, sum)
+  }
+  return(fdata(result, argvals=argvals.))
+}
+
+
+basis.length <- round(0.5*length(x)) # number of B-spline basis.
+bs.basis <- create.bspline.basis(c(-5,5), basis.length)
+bsfd0 <- fd(basisobj=bs.basis)
+bsfdPar <- fdPar(bsfd0, lambda=0.5)
+
+f.basis <- create.fourier.basis(c(-5,5), 11) # number of Fourier basis is set to 11.
+
+
+# plot of smoothed data using B-spline basis.
+# data1.fd and data2.fd can be obtained from data set1 to data set5.
+sm.basis <- bs.basis
+data1.smooth <- smooth.fdata(data1.fd, basis=sm.basis, lambda=0.1)
+data2.smooth <- smooth.fdata(data2.fd, basis=sm.basis, lambda=0.1)
+
+{par(mfcol=c(2,2))
+  plot.fdata(data1.smooth, col=1:5, main=paste("E(a) =", as.character(mu), "B-spline smoothed"))
+  plot.fdata(data2.smooth, col=1:5, main=NULL)}
+par(mfrow=c(1,1))
+
+# plot of smoothed data using Fourier basis.
+sm.basis <- f.basis
+data1.smooth <- smooth.fdata(data1.fd, basis=sm.basis, lambda=0.1)
+data2.smooth <- smooth.fdata(data2.fd, basis=sm.basis, lambda=0.1)
+{plot.fdata(data1.smooth, col=1:5, main=paste("E(a) =", as.character(mu), "Fourier smoothed"))
+  plot.fdata(data2.smooth, col=1:5, main=NULL)}
+par(mfrow=c(1,1))
+
+# smoothed data set.
+{set.seed(100)
+  index <- sample(200, 200)
+  data.set.smoothed <- fdata(rbind(data1.smooth$data, data2.smooth$data)[index,], argvals=x)
+  label.sm <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
 
 ## codes for repeated test
 RSQ.cv.order <- function(fdata., label, K, max.order, deriv.method="bspline", s.basis=NULL, nbasis) {
@@ -412,27 +539,25 @@ RSQ.cv.order <- function(fdata., label, K, max.order, deriv.method="bspline", s.
                                   .export=c("fdata2fd", "fdata.deriv", "get.RSQ", "get.pw.const.beta")) %dopar% {
                                     train <- (1:n)[folds != i]
                                     # for each fold, train data is separated by its classes or groups
-                                    train.fdata <- fdata.
                                     train.class1 <- fdata.
                                     train.class2 <- fdata.
-                                    train.fdata$data <- fdata.$data[train,]
                                     train.class1$data <- fdata.$data[train[which(label[train] == class1)],]
                                     train.class2$data <- fdata.$data[train[which(label[train] == class2)],]
-                                    test.fdata <- fdata.
-                                    test.fdata$data <- fdata.$data[folds == i,]
                                     
                                     # obtain constant weight for all classes respectively
                                     class1.beta <- get.pw.const.beta(train.class1, m=order, method=deriv.method, n.basis=nbasis)
                                     class2.beta <- get.pw.const.beta(train.class2, m=order, method=deriv.method, n.basis=nbasis)
                                     
                                     # calculate RSQs of each class for test data
-                                    class1.RSQ <- get.RSQ(test.fdata, class1.beta, method=deriv.method, n.basis=nbasis)
-                                    class2.RSQ <- get.RSQ(test.fdata, class2.beta, method=deriv.method, n.basis=nbasis)
-                                    RSQ.df <- data.frame(class1=class1.RSQ, class2=class2.RSQ)
+                                    class1.RSQ <- get.RSQ(fdata., class1.beta, method=deriv.method, n.basis=nbasis)
+                                    class2.RSQ <- get.RSQ(fdata., class2.beta, method=deriv.method, n.basis=nbasis)
+                                    RSQ.df <- data.frame(class1=class1.RSQ, class2=class2.RSQ, y=label)
                                     
-                                    # classify validation data as one class with maximum RSQ value
-                                    pred <- as.factor(append(ifelse(apply(RSQ.df, 1, which.max) == 1,
-                                                                    class1, class2), c(class1, class2)))[1:sum(folds == i)]
+                                    # classify validation data through logistic regression model
+                                    logistic.fit <- glm(y~., data=RSQ.df[train,], family=binomial)
+                                    pi.hat <- predict(logistic.fit, newdata=RSQ.df[folds == i,], type="response")
+                                    pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1),
+                                                             c(class1, class2)))[1:sum(folds == i)]
                                     return(mean(pred != label[folds == i]))
                                   }
   }
@@ -508,7 +633,7 @@ RSQ.error <- function(fdata., label, n.repeat, K., max.order., deriv.method.="bs
   n.test <- n - n.train
   class1 <- levels(label)[1]
   class2 <- levels(label)[2]
-  test.errors <- foreach (i=1:n.repeat, .combine="c", .packages=c("fda.usc", "doParallel"),
+  test.results <- foreach (i=1:n.repeat, .packages=c("fda.usc", "doParallel", "dplyr"),
                           .export=c("fdata2fd", "fdata.deriv", "get.RSQ", "get.pw.const.beta", "RSQ.cv.order", "foreach")) %dopar% {
                             set.seed(100*i)
                             train <- sample(1:n, n.train)
@@ -518,23 +643,35 @@ RSQ.error <- function(fdata., label, n.repeat, K., max.order., deriv.method.="bs
                             train.fdata$data <- fdata.$data[train,]
                             train.class1$data <- fdata.$data[train[which(label[train] == class1)],]
                             train.class2$data <- fdata.$data[train[which(label[train] == class2)],]
-                            test.fdata <- fdata.
-                            test.fdata$data <- fdata.$data[-train,]
                             
                             # obtain best order of differential equation that minimizes K-fold CV error via PDA RSQ.
                             best.order <- RSQ.cv.order(train.fdata, label[train], K=K., max.order=max.order.,
                                                        deriv.method=deriv.method., nbasis=nbasis.)
                             
-                            # classify test data using RSQ calculated with best.order.
+                            # classify test data using RSQ calculated with best.order through logistic regression model.
                             class1.beta <- get.pw.const.beta(train.class1, m=best.order, method=deriv.method., n.basis=nbasis.)
                             class2.beta <- get.pw.const.beta(train.class2, m=best.order, method=deriv.method., n.basis=nbasis.)
-                            class1.RSQ <- get.RSQ(test.fdata, class1.beta, method=deriv.method., n.basis=nbasis.)
-                            class2.RSQ <- get.RSQ(test.fdata, class2.beta, method=deriv.method., n.basis=nbasis.)
-                            RSQ.df <- data.frame(class1=class1.RSQ, class2=class2.RSQ)
-                            pred <- as.factor(append(ifelse(apply(RSQ.df, 1, which.max) == 1, class1, class2), c(class1, class2)))[1:n.test]
-                            return(mean(pred != label[-train]))
+                            class1.RSQ <- get.RSQ(fdata., class1.beta, method=deriv.method., n.basis=nbasis.)
+                            class2.RSQ <- get.RSQ(fdata., class2.beta, method=deriv.method., n.basis=nbasis.)
+                            RSQ.df <- data.frame(class1=class1.RSQ, class2=class2.RSQ, y=label)
+                            
+                            logistic.fit <- glm(y~., data=RSQ.df[train,], family=binomial)
+                            pi.hat <- predict(logistic.fit, newdata=RSQ.df[-train,], type="response")
+                            pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1),
+                                                     c(class1, class2)))[1:length(pi.hat)]
+                            pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
+                            posterior <- c(0.5*mean(pi.hat.df$y == "2"))
+                            for (j in 1:(nrow(pi.hat.df)-1)) {
+                              posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == "1") + 0.5*mean(pi.hat.df$y[-(1:j)] == "2")
+                              posterior <- c(posterior, posterior.j)
+                            }
+                            posterior <- c(posterior, 0.5*mean(pi.hat.df$y == "1"))
+                            
+                            result.i <- data.frame(test.error=mean(pred != label[-train]), orders=best.order)
+                            result.i$bayes.error <- 1 - max(posterior)
+                            return(result.i)
                           }
-  result <- data.frame(mean=mean(test.errors), standard.error=sd(test.errors))
+  result <- as.data.frame(apply(t(sapply(test.results, cbind)), 2, unlist))
   return(result)
 }
 
@@ -553,37 +690,49 @@ pda.score.error <- function(fdata., label, n.repeat, K., max.order., deriv.metho
   class1 <- levels(label)[1]
   class2 <- levels(label)[2]
   test.errors <- numeric(n.repeat)
-  for (i in 1:n.repeat)  {
-    set.seed(100*i)
-    train <- sample(1:n, n.train)
-    train.fdata <- fdata.
-    train.fdata$data <- fdata.$data[train,]
-    
-    # obtain best order of differential equation that minimizes K-fold CV error via PDA scores.
-    best.order <- pda.score.cv.order(train.fdata, label[train], K=K., max.order=max.order.,
-                                     deriv.method=deriv.method., nbasis=nbasis.)
-    coefs <- get.pw.const.beta(train.fdata, m=best.order, method=deriv.method., n.basis=nbasis.)
-    psi.list <- get.psi(coefs, train.fdata$argvals)
-    
-    if (sum(sapply(psi.list, is.infinite))) {
-      return(Inf)
-    }
-    mean.curve <- apply(train.fdata$data, 2, mean)
-    diff <- as.matrix(fdata.$data) - matrix(mean.curve, nrow=n, ncol=length(mean.curve), byrow=T)
-    scores <- list()
-    scores[["y"]] <- label
-    for (j in 1:length(psi.list)) {
-      scores[[as.character(j)]] <- diff %*% matrix(psi.list[[j]], ncol=1)
-    }
-    scores <- as.data.frame(scores)
-    
-    # classify test data using scores calculated with best.order.
-    logistic.fit <- glm(y~., data=scores[train,], family=binomial)
-    pi.hat <- predict(logistic.fit, newdata=scores[-train,], type="response")
-    pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
-    test.errors[i] <- (mean(pred != scores$y[-train]))
-  }
-  result <- data.frame(mean=mean(test.errors), standard.error=sd(test.errors))
+  test.results <- foreach (i=1:n.repeat, .packages=c("fda.usc", "doParallel", "dplyr"),
+                           .export=c("fdata2fd", "fdata.deriv", "get.psi", "get.pw.const.beta", "pda.score.cv.order", "foreach")) %dopar% {
+                             set.seed(100*i)
+                             train <- sample(1:n, n.train)
+                             train.fdata <- fdata.
+                             train.fdata$data <- fdata.$data[train,]
+                             
+                             # obtain best order of differential equation that minimizes K-fold CV error via PDA scores.
+                             best.order <- pda.score.cv.order(train.fdata, label[train], K=K., max.order=max.order.,
+                                                              deriv.method=deriv.method., nbasis=nbasis.)
+                             coefs <- get.pw.const.beta(train.fdata, m=best.order, method=deriv.method., n.basis=nbasis.)
+                             psi.list <- get.psi(coefs, train.fdata$argvals)
+                             
+                             if (sum(sapply(psi.list, is.infinite))) {
+                               return(Inf)
+                             }
+                             mean.curve <- apply(train.fdata$data, 2, mean)
+                             diff <- as.matrix(fdata.$data) - matrix(mean.curve, nrow=n, ncol=length(mean.curve), byrow=T)
+                             scores <- list()
+                             scores[["y"]] <- label
+                             for (j in 1:length(psi.list)) {
+                               scores[[as.character(j)]] <- diff %*% matrix(psi.list[[j]], ncol=1)
+                             }
+                             scores <- as.data.frame(scores)
+                             
+                             # classify test data using scores calculated with best.order.
+                             logistic.fit <- glm(y~., data=scores[train,], family=binomial)
+                             pi.hat <- predict(logistic.fit, newdata=scores[-train,], type="response")
+                             pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
+                             pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
+                             
+                             posterior <- c(0.5*mean(pi.hat.df$y == "2"))
+                             for (j in 1:(nrow(pi.hat.df)-1)) {
+                               posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == "1") + 0.5*mean(pi.hat.df$y[-(1:j)] == "2")
+                               posterior <- c(posterior, posterior.j)
+                             }
+                             posterior <- c(posterior, 0.5*mean(pi.hat.df$y == "1"))
+                             
+                             result.i <- data.frame(test.error=mean(pred != label[-train]), orders=best.order)
+                             result.i$bayes.error <- 1 - max(posterior)
+                             return(result.i)
+                           }
+  result <- as.data.frame(apply(t(sapply(test.results, cbind)), 2, unlist))
   return(result)
 }
 
@@ -599,8 +748,9 @@ fpc.score.error <- function(fdata., label, n.repeat, max.fpc, lam=1) {
   class1 <- levels(label)[1]
   class2 <- levels(label)[2]
   test.errors <- matrix(0, n.repeat, max.fpc)
+  bayes.errors <- matrix(0, n.repeat, max.fpc)
   for (fpc in 1:max.fpc) {
-    test.errors[,fpc] <- foreach (i=1:n.repeat, .combine="c", .packages="fda.usc",
+    test.results <- foreach (i=1:n.repeat, .packages="fda.usc",
                                   .export=c("fdata2fd", "fdata.deriv", "get.fpc.score")) %dopar% {
                                     set.seed(100*i)
                                     train <- sample(1:n, n.train)
@@ -613,154 +763,26 @@ fpc.score.error <- function(fdata., label, n.repeat, max.fpc, lam=1) {
                                     logistic.fit <- glm(y~., data=scores[train,], family=binomial)
                                     pi.hat <- predict(logistic.fit, newdata=scores[-train,], type="response")
                                     pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
-                                    return(mean(pred != scores$y[-train]))
+                                    pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
+                                    
+                                    posterior <- c(0.5*mean(pi.hat.df$y == "2"))
+                                    for (j in 1:(nrow(pi.hat.df)-1)) {
+                                      posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == "1") + 0.5*mean(pi.hat.df$y[-(1:j)] == "2")
+                                      posterior <- c(posterior, posterior.j)
+                                    }
+                                    posterior <- c(posterior, 0.5*mean(pi.hat.df$y == "1"))
+                                    
+                                    result.i <- data.frame(test.error=mean(pred != label[-train]), bayes.error=1 - max(posterior))
+                                    return(result.i)
                                   }
+    test.results <- as.data.frame(apply(t(sapply(test.results, cbind)), 2, unlist))
+    test.errors[,fpc] <- test.results$test.error
+    bayes.errors[,fpc] <- test.results$bayes.error
     print(paste("max.fpc ", " complete", sep=as.character(fpc)))
   }
-  result <- data.frame(mean=apply(test.errors, 2, mean), standard.error=apply(test.errors, 2, sd))
+  result <- list()
+  result$test.errors <- data.frame(mean=apply(test.errors, 2, mean), standard.error=apply(test.errors, 2, sd))
+  result$bayes.error <- data.frame(mean=apply(bayes.errors, 2, mean), standard.error=apply(bayes.errors, 2, sd))
   return(result)
 }
 
-library(doParallel)
-library(xtable)
-nc <- detectCores()
-registerDoParallel(nc-1)
-nfold <- 8
-repeat.n <- 10
-
-# generate simulation data set.
-# data set2.
-nfold <- 8
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(100)
-  data1 <- simul.data(list(cos1, sin1), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(cos3, sin3), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set1 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label1 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-# data set2.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(100)
-  data1 <- simul.data(list(exp5), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(exp0.5), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set2 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label2 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-# data set3.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(300)
-  data1 <- simul.data(list(exp0.25*cos1, exp0.25*sin1), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(exp0.5*cos3, exp0.5*sin3), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set3 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label3 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-# data set4.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(700)
-  data1 <- simul.data(list(cos1, sin1), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(cos1.05, sin1.05), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set4 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label4 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-# data set5.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(100)
-  data1 <- simul.data(list(x.poly3), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(3*cos3, 3*sin3), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set5 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label5 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-
-# repeated test after smoothing
-smooth.fdata <- function(fdata., basis, lambda, argvals.=NULL) {
-  # returns smoothed functional data.
-  # basis : spline basis used for smoothing the functional data.
-  # lambda : roughness penalty parameter for smoothing the functional data.
-  # argvals. : sample points of out put. If argvals=NULL, sample points is same with fdata..
-  library(fda)
-  library(fda.usc)
-  l <- lambda
-  n <- nrow(fdata.$data)
-  if (is.null(argvals.)) {
-    argvals. <- fdata.$argvals
-  }
-  basis.mat <- getbasismatrix(argvals., basis) # returns the matrix of values of each basis at sample points.
-  fd0 <- fd(basisobj=basis)
-  basis.fdPar <- fdPar(fd0, lambda=l)
-  fdata.smoothed <- smooth.basis(argvals., t(fdata.$data), basis.fdPar)$fd # coefficients of each basis after smoothing.
-  result <- matrix(0, n, length(argvals.))
-  
-  # convert the coefficients of each basis to the values at sample points.
-  for (i in 1:n) {
-    result[i,] <- apply(t(basis.mat) * fdata.smoothed$coefs[,i], 2, sum)
-  }
-  return(fdata(result, argvals=argvals.))
-}
-
-
-basis.length <- round(0.5*length(x)) # number of B-spline basis.
-bs.basis <- create.bspline.basis(c(-5,5), basis.length)
-f.basis <- create.fourier.basis(c(-5,5), 11) # number of Fourier basis is set to 11.
-
-# smoothed data set can be obtained from data set1 to data set5.
-sm.basis <- bs.basis
-sm.basis <- f.basis
-gcv.search <- function(lam){
-  smoothList <- smooth.basisPar(argvals=1:5, y=t(train.pca$x[,1:5]), fdobj=pca.basis, lambda=lam)
-  with(smoothList, return(c(lambda=lam, df=df, gcv=sum(gcv))))
-}
-
-data1.smooth <- smooth.fdata(data1.fd, basis=sm.basis, lambda=0.1)
-data2.smooth <- smooth.fdata(data2.fd, basis=sm.basis, lambda=0.1)
-{set.seed(100)
-  index <- sample(200, 200)
-  data.set.smoothed <- fdata(rbind(data1.smooth$data, data2.smooth$data)[index,], argvals=x)
-  label.sm <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-# repeated classification error of smoothed data set with deriv.method="fourier".
-set.seed(100)
-set.sm.RSQ.error <- RSQ.error(data.set.smoothed, label.sm, n.repeat=repeat.n, K.=nfold, max.order.=4, deriv.method.="fourier", nbasis.=11)
-set.sm.pda.error <- pda.score.error(data.set.smoothed, label.sm, n.repeat=repeat.n, K.=nfold, max.order.=4, deriv.method.="fourier", nbasis.=11)
-set.sm.fpc.error <- fpc.score.error(data.set.smoothed, label.sm, n.repeat=repeat.n, max.fpc=5)
-
-
-# repeated classification error of smoothed data set with deriv.method="bspline".
-set.seed(100)
-set.sm.RSQ.error <- RSQ.error(data.set.smoothed, label.sm, n.repeat=repeat.n, K.=nfold, max.order.=4, deriv.method.="bspline", nbasis.=100)
-set.sm.pda.error <- pda.score.error(data.set.smoothed, label.sm, n.repeat=repeat.n, K.=nfold, max.order.=4, deriv.method.="bspline", nbasis.=100)
-set.sm.fpc.error <- fpc.score.error(data.set.smoothed, label.sm, n.repeat=repeat.n, max.fpc=5)
-
-set.bsm.result0.rt <- cbind(rbind(rbind(set.sm.RSQ.error, set.sm.pda.error), set.sm.fpc.error), max.fpc=c("-", "-", 1:5), stringsAsFactors=F)
-set.fsm.result0.rt <- cbind(rbind(rbind(set.sm.RSQ.error, set.sm.pda.error), set.sm.fpc.error), max.fpc=c("-", "-", 1:5), stringsAsFactors=F)
-set.sm.result0.rt <- cbind(paste(round(set.bsm.result0.rt[,1], 2), " (", round(set.bsm.result0.rt[,2], 2), ")", sep=""), set.bsm.result0.rt[,3],
-                           paste(round(set.fsm.result0.rt[,1], 2), " (", round(set.fsm.result0.rt[,2], 2), ")", sep=""), set.fsm.result0.rt[,3])
-
-row.names(set.sm.result0.rt) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA", 5), as.character(1:5), sep=""))
-xtable(set.sm.result0.rt)
-
-set.bsm.result1.rt <- cbind(rbind(rbind(set.sm.RSQ.error, set.sm.pda.error), set.sm.fpc.error), max.fpc=c("-", "-", 1:5), stringsAsFactors=F)
-set.fsm.result1.rt <- cbind(rbind(rbind(set.sm.RSQ.error, set.sm.pda.error), set.sm.fpc.error), max.fpc=c("-", "-", 1:5), stringsAsFactors=F)
-set.sm.result1.rt <- cbind(paste(round(set.bsm.result1.rt[,1], 2), " (", round(set.bsm.result1.rt[,2], 2), ")", sep=""), set.bsm.result1.rt[,3],
-                           paste(round(set.fsm.result1.rt[,1], 2), " (", round(set.fsm.result1.rt[,2], 2), ")", sep=""), set.fsm.result1.rt[,3])
-row.names(set.sm.result1.rt) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA", 5), as.character(1:5), sep=""))
-xtable(set.sm.result1.rt)
