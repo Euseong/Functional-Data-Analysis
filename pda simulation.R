@@ -345,12 +345,14 @@ fpc.score.cv.error <- function(fdata., label, K, max.fpc, lam=1) {
   return(result)
 }
 
-simul.data <- function(functions, N, mu, error=T) {
+simul.data <- function(functions, N, mu, error=T, covariance=F) {
   # returns simulation data for given eigen functions.
   # functions : the list of eigen functions which simulation data is based on.
   # N : number of data curves to generate.
   # mu : mean of random weight which is multiplied by each eigen function.
   # error : weight or coefficient of random noise. random noise from N(0,1) is multiplied by this argument, and added to each data curve.
+  # covariance : covariance matrix among data points of eigen functions. If False, all data points are assumed to be independent each other.
+  #              If covariance matrix is given, errors are generated from multivariate normal distribution, MVN(mu, covariance).
   if (!is.list(functions)) {
     print("functions must be list")
     return()
@@ -358,12 +360,23 @@ simul.data <- function(functions, N, mu, error=T) {
   n.functions <- length(functions) # number of given eigen functions.
   x.len <- length(functions[[1]]) # number of sample points.
   result <- matrix(0, N, x.len)
+  
+  if (covariance) {
+    if (length(mu) < 2) {print("the number of means must be greater than 1"); return()}
+    for (i in 1:n.functions) {
+      for (j in 1:N) {
+        result[j, ] <- result[j, ] + rnorm(1,mu,1)*functions[[i]] + mvrnorm(1, mu=rep(error, 100), Sigma=covariance)
+      }
+    }
+  return(result)
+  }else{
   for (i in 1:n.functions) {
     for (j in 1:N) {
       result[j, ] <- result[j, ] + rnorm(1,mu,1)*functions[[i]] + error*rnorm(x.len, 0, 1)
     }
   }
   return(result)
+  }
 }
 
 x <- seq(-5, 5, len=200) # whole simulation data uses 200 sample points equally separated within interval (-5, 5).
