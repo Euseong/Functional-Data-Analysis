@@ -772,46 +772,110 @@ for (i in 1:nrow(simul.params)){
   data.set1.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
 }
 
-# data set2.
-{set.seed(100)
-  data1 <- simul.data(list(exp5), 100, rep(mu, 100), error=err, covariance=err.cov)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(exp0.5), 100, rep(mu, 100), error=err, covariance=err.cov)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set2 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label2 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
 
+# data set2.
+data.set2.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(100)
+  data1 <- simul.data(list(exp5), 100, mu.i, error=err.i, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(exp0.5), 100, mu.i, error=err.i, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  data.set2.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
 
 
 # data set3.
-{set.seed(300)
-  data1 <- simul.data(list(exp0.25*cos1, exp0.25*sin1), 100, rep(mu, 100), error=err, covariance=err.cov)
+data.set3.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(300)
+  data1 <- simul.data(list(exp0.25*cos1, exp0.25*sin1), 100, mu.i, error=err.i, covariance=err.cov)
   data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(exp0.5*cos3, exp0.5*sin3), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2 <- simul.data(list(exp0.5*cos3, exp0.5*sin3), 100, mu.i, error=err.i, covariance=err.cov)
   data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set3 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label3 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+  data.set3.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
 
 
 # data set4.
-{set.seed(700)
-  data1 <- simul.data(list(cos1, sin1), 100, rep(mu, 100), error=err, covariance=err.cov)
+data.set4.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(700)
+  data1 <- simul.data(list(cos1, sin1), 100, mu.i, error=err.i, covariance=err.cov)
   data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(cos1.05, sin1.05), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2 <- simul.data(list(cos1.05, sin1.05), 100, mu.i, error=err.i, covariance=err.cov)
   data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set4 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label4 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+  data.set4.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
 
 
 # data set5.
-{set.seed(100)
-  data1 <- simul.data(list(x.poly3), 100, rep(mu, 100), error=err, covariance=err.cov)
+data.set5.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(100)
+  data1 <- simul.data(list(x.poly3), 100, mu.i, error=err.i, covariance=err.cov)
   data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(3*cos3, 3*sin3), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2 <- simul.data(list(3*cos3, 3*sin3), 100, mu.i, error=err.i, covariance=err.cov)
   data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set5 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label5 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+  data.set5.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
