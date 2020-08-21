@@ -1,6 +1,9 @@
 library(fda)
 library(fda.usc)
 library(dplyr)
+library(MASS)
+library(reshape2)
+library(CVTuningCov)
 
 # To differentiate more than 4 times, functions fdata2fd and fdata.deriv in fda.usc package are modified.
 fdata2fd <- function (fdataobj, type.basis = NULL, nbasis = NULL, nderiv = 0, 
