@@ -345,7 +345,7 @@ fpc.score.cv.error <- function(fdata., label, K, max.fpc, lam=1) {
   return(result)
 }
 
-simul.data <- function(functions, N, mu, error=T, covariance=F) {
+simul.data <- function(functions, N, mu, error=T, covariance=0) {
   # returns simulation data for given eigen functions.
   # functions : the list of eigen functions which simulation data is based on.
   # N : number of data curves to generate.
@@ -361,21 +361,20 @@ simul.data <- function(functions, N, mu, error=T, covariance=F) {
   x.len <- length(functions[[1]]) # number of sample points.
   result <- matrix(0, N, x.len)
   
-  if (covariance) {
-    if (length(mu) < 2) {print("the number of means must be greater than 1"); return()}
+  if (is.matrix(covariance)) {
     for (i in 1:n.functions) {
       for (j in 1:N) {
-        result[j, ] <- result[j, ] + rnorm(1,mu,1)*functions[[i]] + mvrnorm(1, mu=rep(error, 100), Sigma=covariance)
+        result[j, ] <- result[j, ] + rnorm(1,mu,1)*functions[[i]] + error*mvrnorm(1, mu=rep(0, x.len), Sigma=covariance)
       }
     }
-  return(result)
+    return(result)
   }else{
-  for (i in 1:n.functions) {
-    for (j in 1:N) {
-      result[j, ] <- result[j, ] + rnorm(1,mu,1)*functions[[i]] + error*rnorm(x.len, 0, 1)
+    for (i in 1:n.functions) {
+      for (j in 1:N) {
+        result[j, ] <- result[j, ] + rnorm(1,mu,1)*functions[[i]] + error*rnorm(x.len, 0, 1)
+      }
     }
-  }
-  return(result)
+    return(result)
   }
 }
 
@@ -405,72 +404,6 @@ par(mfrow=c(1,1))
 library(doParallel)
 nc <- detectCores()
 registerDoParallel(nc-1)
-
-# generate simulation data set.
-nfold <- 8
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(100)
-  data1 <- simul.data(list(cos1, sin1), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(cos3, sin3), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set1 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label1 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-
-# data set2.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(100)
-  data1 <- simul.data(list(exp5), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(exp0.5), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set2 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label2 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-
-
-# data set3.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(300)
-  data1 <- simul.data(list(exp0.25*cos1, exp0.25*sin1), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(exp0.5*cos3, exp0.5*sin3), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set3 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label3 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-
-# data set4.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(700)
-  data1 <- simul.data(list(cos1, sin1), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(cos1.05, sin1.05), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set4 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label4 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
-
-
-# data set5.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-{set.seed(100)
-  data1 <- simul.data(list(x.poly3), 100, mu, error=err)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(3*cos3, 3*sin3), 100, mu, error=err)
-  data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set5 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label5 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
 
 
 # PDA after smoothing.
@@ -801,21 +734,43 @@ fpc.score.error <- function(fdata., label, n.repeat, max.fpc, lam=1) {
 
 ## simulation data with covariance structure
  # data set 1.
-err <- 0.1 # used 0.1 or 1
-mu <- 0    # used 0 or 1
-rho <- 0.1 # used +-0.1 or +-0.4
-err.cov <- matrix(rho, 100, 100)
-diag(err.cov) <- 1
-err.cov <- err*err.cov
+err <- c(0.1, 1) # used 0.1 or 1
+mu <- c(0, 1) # used 0 or 1
+rho <- c(0.1, 0.4, 0.7) # used +-0.1 or +-
 
-{set.seed(100)
-  data1 <- simul.data(list(cos1, sin1), 100, rep(mu, 100), error=err, covariance=err.cov)
+a <- merge(err, mu)
+b <- merge(err, rho)
+colnames(a) <- c("err", "mu")
+colnames(b) <- c("err", "rho")
+cov.params <- merge(a, b, by=err)
+simul.params <- rbind(cbind(a, rho=rep(0, nrow(a))), cov.params, cov.params)
+
+x.len <- length(x)
+
+data.set1.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+    err.cov <- matrix(rho.i, x.len, x.len)
+    diag(err.cov) <- 1
+    err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(100)
+  data1 <- simul.data(list(cos1, sin1), 100, mu.i, error=err.i, covariance=err.cov)
   data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(cos3, sin3), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2 <- simul.data(list(cos3, sin3), 100, mu.i, error=err.i, covariance=err.cov)
   data2.fd <- fdata(data2, argvals=x)
-  index <- sample(200, 200)
-  data.set1 <- fdata(rbind(data1, data2)[index,], argvals=x)
-  label1 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+  data.set1.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
 
 # data set2.
 {set.seed(100)
