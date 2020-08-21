@@ -1,8 +1,9 @@
-lambdas <- 10^(-5:3)
 library(doParallel)
 library(xtable)
+library(stringr)
 nc <- detectCores()
 registerDoParallel(nc-1)
+lambdas <- 10^(-5:3)
 nfold <- 8
 repeat.n <- 100
 basis.length <- round(0.5*length(x)) # number of B-spline basis.
@@ -99,8 +100,8 @@ gcv.mat <- rbind(gcv.mat, c(gcv.lambda1, gcv.lambda2))
   
   row.names(set.sm.result0.rt) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
   row.names(set.sm.result0.bayes) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
-  xtable(set.sm.result0.rt)
-  xtable(set.sm.result0.bayes)
+  xtable(set.sm.result0.rt, caption=str_interp("data set ${} test error (mu=${mu}, error=${err})"))
+  xtable(set.sm.result0.bayes, caption=str_interp("data set ${} bayes error (mu=${mu}, error=${err})"))
 }
 
 
@@ -193,7 +194,10 @@ mu <- 1#
   
   row.names(set.sm.result0.rt) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
   row.names(set.sm.result0.bayes) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
-  xtable(set.sm.result0.rt)
-  xtable(set.sm.result0.bayes)
+  xtable(set.sm.result0.rt, caption=str_interp("data set ${} test error(mu=${mu}, error=${err})", ))
+  xtable(set.sm.result0.bayes, caption=str_interp("data set ${} bayes error(mu=${mu}, error=${err})"))
 }
 # write.csv(gcv.mat, "lambda.csv")
+
+print(a, file = "a.txt", compress = FALSE, append=T)
+print(xtable(set.sm.result0.bayes), file = "a.txt", compress = FALSE, append=T)
