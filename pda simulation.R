@@ -786,3 +786,64 @@ fpc.score.error <- function(fdata., label, n.repeat, max.fpc, lam=1) {
   return(result)
 }
 
+## simulation data with covariance structure
+ # data set 1.
+err <- 0.1 # used 0.1 or 1
+mu <- 0    # used 0 or 1
+rho <- 0.1 # used +-0.1 or +-0.4
+err.cov <- matrix(rho, 100, 100)
+diag(err.cov) <- 1
+err.cov <- err*err.cov
+
+{set.seed(100)
+  data1 <- simul.data(list(cos1, sin1), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(cos3, sin3), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set1 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label1 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+# data set2.
+{set.seed(100)
+  data1 <- simul.data(list(exp5), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(exp0.5), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set2 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label2 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+
+
+# data set3.
+{set.seed(300)
+  data1 <- simul.data(list(exp0.25*cos1, exp0.25*sin1), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(exp0.5*cos3, exp0.5*sin3), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set3 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label3 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+
+# data set4.
+{set.seed(700)
+  data1 <- simul.data(list(cos1, sin1), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(cos1.05, sin1.05), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set4 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label4 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
+
+
+# data set5.
+{set.seed(100)
+  data1 <- simul.data(list(x.poly3), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(3*cos3, 3*sin3), 100, rep(mu, 100), error=err, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  index <- sample(200, 200)
+  data.set5 <- fdata(rbind(data1, data2)[index,], argvals=x)
+  label5 <- as.factor(c(rep("1", 100), rep("2", 100))[index])}
