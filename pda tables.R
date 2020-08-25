@@ -30,9 +30,9 @@ gcv.search <- function(lam, fdata., basis){
 
 
 ## 
-# data set 7
-data.set.list <- data.set7.list
-data.set.num <- 7
+# data set 3
+data.set.list <- data.set3.list
+data.set.num <- 3
 results.list <- list()
 path <- paste0(working.dir, "/data set", data.set.num, " tables.txt")
 scenario.num <- 1
@@ -105,21 +105,23 @@ for (data.set.i in data.set.list) {
   set.fsm.result0.rt <- rbind(rbind(set.sm.RSQ.error, set.sm.pda.error), set.sm.fpc.error$test.errors)#, max.fpc=c("-", "-", 1:5), stringsAsFactors=F)
   set.fsm.result0.bayes <- rbind(rbind(set.sm.RSQ.bayes.error, set.sm.pda.bayes.error), set.sm.fpc.error$bayes.error)
   
-  set.sm.result0.rt <- cbind(paste(round(set.bsm.result0.rt[,1], 2), " (", round(set.bsm.result0.rt[,2], 2), ")", sep=""), #set.bsm.result0.rt[,3],
-                             paste(round(set.fsm.result0.rt[,1], 2), " (", round(set.fsm.result0.rt[,2], 2), ")", sep=""))#, set.fsm.result0.rt[,3])
-  set.sm.result0.bayes <- cbind(paste(round(set.bsm.result0.bayes[,1], 2), " (", round(set.bsm.result0.bayes[,2], 2), ")", sep=""),
-                                paste(round(set.fsm.result0.bayes[,1], 2), " (", round(set.fsm.result0.bayes[,2], 2), ")", sep=""))
+  set.bsm.result0 <- cbind(paste(round(set.bsm.result0.rt[,1], 2), " (", round(set.bsm.result0.rt[,2], 2), ")", sep=""),
+                           paste(round(set.bsm.result0.bayes[,1], 2), " (", round(set.bsm.result0.bayes[,2], 2), ")", sep=""))
+  set.fsm.result0 <- cbind(paste(round(set.fsm.result0.rt[,1], 2), " (", round(set.fsm.result0.rt[,2], 2), ")", sep=""),
+                           paste(round(set.fsm.result0.bayes[,1], 2), " (", round(set.fsm.result0.bayes[,2], 2), ")", sep=""))
   
-  row.names(set.sm.result0.rt) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
-  row.names(set.sm.result0.bayes) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
-  test.error <- xtable(set.sm.result0.rt,
-                       caption=str_interp("data set ${data.set.num} ${scenario.num}th test error (mu=${mu}, error=${err}, rho=${rho})"))
-  bayes.error <- xtable(set.sm.result0.bayes,
-                        caption=str_interp("data set ${data.set.num} ${scenario.num}th bayes error (mu=${mu}, error=${err}, rho=${rho})"))
+  row.names(set.bsm.result0) <- c("& PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
+  # row.names(set.sm.result0.bayes) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
+  # test.error <- xtable(set.sm.result0.rt,
+  #                      caption=str_interp("data set ${data.set.num} ${scenario.num}th test error (mu=${mu}, error=${err}, rho=${rho})"))
+  # bayes.error <- xtable(set.sm.result0.bayes,
+  #                       caption=str_interp("data set ${data.set.num} ${scenario.num}th bayes error (mu=${mu}, error=${err}, rho=${rho})"))
+  data.set.i.results <- xtable(cbind(set.bsm.result0, set.fsm.result0),
+                               caption=str_interp("data set ${data.set.num} ${scenario.num}th test error (mu=${mu}, error=${err}, rho=${rho})"))
   
   is.append <- scenario.num > 1
-  print(test.error, file = path, compress = FALSE, append=is.append)
-  print(bayes.error, file = path, compress = FALSE, append=T)
+  print(data.set.i.results, file = path, compress = FALSE, append=is.append)
+  # print(bayes.error, file = path, compress = FALSE, append=T)
   print(paste0(scenario.num, "th scenario over"))
   scenario.num <- scenario.num + 1
   print(Sys.time())
@@ -162,6 +164,8 @@ for (data.set.i in data.set.list) {
   set.sm.pda.result <- pda.score.error(data.set.smoothed, label.sm, n.repeat=repeat.n, K.=nfold, max.order.=4, deriv.method.="bspline", nbasis.=100)
   set.sm.fpc.error <- fpc.score.error(data.set.smoothed, label.sm, n.repeat=repeat.n, max.fpc=5)
   
+  BS.smoothing.results <- list(RSQ=set.sm.RSQ.result, PDA.score=set.sm.pda.result)
+  
   set.sm.RSQ.error <- data.frame(mean=mean(set.sm.RSQ.result$test.error), standard.error=sd(set.sm.RSQ.result$test.error))
   set.sm.RSQ.bayes.error <- data.frame(mean=mean(set.sm.RSQ.result$bayes.error), standard.error=sd(set.sm.RSQ.result$bayes.error))
   set.sm.pda.error <- data.frame(mean=mean(set.sm.pda.result$test.error), standard.error=sd(set.sm.pda.result$test.error))
@@ -189,6 +193,10 @@ for (data.set.i in data.set.list) {
   set.sm.pda.result <- pda.score.error(data.set.smoothed, label.sm, n.repeat=repeat.n, K.=nfold, max.order.=4, deriv.method.="bspline", nbasis.=100)
   set.sm.fpc.error <- fpc.score.error(data.set.smoothed, label.sm, n.repeat=repeat.n, max.fpc=5)
   
+  Fourier.smoothing.results <- list(RSQ=set.sm.RSQ.result, PDA.score=set.sm.pda.result)
+  list.name <- names(data.set.list)[scenario.num]
+  results.list[[list.name]] <- list(Bs.smoothing=BS.smoothing.results, F.smoothing=Fourier.smoothing.results)
+  
   set.sm.RSQ.error <- data.frame(mean=mean(set.sm.RSQ.result$test.error), standard.error=sd(set.sm.RSQ.result$test.error))
   set.sm.RSQ.bayes.error <- data.frame(mean=mean(set.sm.RSQ.result$bayes.error), standard.error=sd(set.sm.RSQ.result$bayes.error))
   set.sm.pda.error <- data.frame(mean=mean(set.sm.pda.result$test.error), standard.error=sd(set.sm.pda.result$test.error))
@@ -197,22 +205,25 @@ for (data.set.i in data.set.list) {
   set.fsm.result0.rt <- rbind(rbind(set.sm.RSQ.error, set.sm.pda.error), set.sm.fpc.error$test.errors)#, max.fpc=c("-", "-", 1:5), stringsAsFactors=F)
   set.fsm.result0.bayes <- rbind(rbind(set.sm.RSQ.bayes.error, set.sm.pda.bayes.error), set.sm.fpc.error$bayes.error)
   
-  set.sm.result0.rt <- cbind(paste(round(set.bsm.result0.rt[,1], 2), " (", round(set.bsm.result0.rt[,2], 2), ")", sep=""), #set.bsm.result0.rt[,3],
-                             paste(round(set.fsm.result0.rt[,1], 2), " (", round(set.fsm.result0.rt[,2], 2), ")", sep=""))#, set.fsm.result0.rt[,3])
-  set.sm.result0.bayes <- cbind(paste(round(set.bsm.result0.bayes[,1], 2), " (", round(set.bsm.result0.bayes[,2], 2), ")", sep=""),
-                                paste(round(set.fsm.result0.bayes[,1], 2), " (", round(set.fsm.result0.bayes[,2], 2), ")", sep=""))
+  set.bsm.result0 <- cbind(paste(round(set.bsm.result0.rt[,1], 2), " (", round(set.bsm.result0.rt[,2], 2), ")", sep=""),
+                           paste(round(set.bsm.result0.bayes[,1], 2), " (", round(set.bsm.result0.bayes[,2], 2), ")", sep=""))
+  set.fsm.result0 <- cbind(paste(round(set.fsm.result0.rt[,1], 2), " (", round(set.fsm.result0.rt[,2], 2), ")", sep=""),
+                           paste(round(set.fsm.result0.bayes[,1], 2), " (", round(set.fsm.result0.bayes[,2], 2), ")", sep=""))
   
-  row.names(set.sm.result0.rt) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
-  row.names(set.sm.result0.bayes) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
-  test.error <- xtable(set.sm.result0.rt,
-                       caption=str_interp("data set ${data.set.num} ${scenario.num}th test error (mu=${mu}, error=${err}, rho=${rho})"))
-  bayes.error <- xtable(set.sm.result0.bayes,
-                        caption=str_interp("data set ${data.set.num} ${scenario.num}th bayes error (mu=${mu}, error=${err}, rho=${rho})"))
+  row.names(set.bsm.result0) <- c("& PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
+  # row.names(set.sm.result0.bayes) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA (num of PCs=", 5), as.character(1:5), ")", sep=""))
+  # test.error <- xtable(set.sm.result0.rt,
+  #                      caption=str_interp("data set ${data.set.num} ${scenario.num}th test error (mu=${mu}, error=${err}, rho=${rho})"))
+  # bayes.error <- xtable(set.sm.result0.bayes,
+  #                       caption=str_interp("data set ${data.set.num} ${scenario.num}th bayes error (mu=${mu}, error=${err}, rho=${rho})"))
+  data.set.i.results <- xtable(cbind(set.bsm.result0, set.fsm.result0),
+                               caption=str_interp("data set ${data.set.num} ${scenario.num}th test error (mu=${mu}, error=${err}, rho=${rho})"))
   
   is.append <- scenario.num > 1
-  print(test.error, file = path, compress = FALSE, append=is.append)
-  print(bayes.error, file = path, compress = FALSE, append=T)
+  print(data.set.i.results, file = path, compress = FALSE, append=is.append)
+  # print(bayes.error, file = path, compress = FALSE, append=T)
   print(paste0(scenario.num, "th scenario over"))
   scenario.num <- scenario.num + 1
 }
+saveRDS(results.list, file=paste0(working.dir, "/data set", data.set.num, " results.RData", sep=""))
 paste("start :", start.time, "end :", Sys.time())
