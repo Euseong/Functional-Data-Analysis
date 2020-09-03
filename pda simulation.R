@@ -382,6 +382,39 @@ simul.data <- function(functions, N, mu, error=T, covariance=0) {
   }
 }
 
+simul.data2 <- function(functions, N, mu, error=T, covariance=0) {
+  # returns simulation data for given eigen functions.
+  # functions : the list of eigen functions which simulation data is based on.
+  # N : number of data curves to generate.
+  # mu : constant weight multiplied by each eigen function.
+  # error : weight or coefficient of random noise. random noise from N(0,1) is multiplied by this argument, and added to each data curve.
+  # covariance : covariance matrix among data points of eigen functions. If False, all data points are assumed to be independent each other.
+  #              If covariance matrix is given, errors are generated from multivariate normal distribution, MVN(mu, covariance).
+  if (!is.list(functions)) {
+    print("functions must be list")
+    return()
+  }
+  n.functions <- length(functions) # number of given eigen functions.
+  x.len <- length(functions[[1]]) # number of sample points.
+  result <- matrix(0, N, x.len)
+  
+  if (is.matrix(covariance)) {
+    for (i in 1:n.functions) {
+      for (j in 1:N) {
+        result[j, ] <- result[j, ] + mu*functions[[i]] + error*mvrnorm(1, mu=rep(0, x.len), Sigma=covariance)
+      }
+    }
+    return(result)
+  }else{
+    for (i in 1:n.functions) {
+      for (j in 1:N) {
+        result[j, ] <- result[j, ] + mu*functions[[i]] + error*rnorm(x.len, 0, 1)
+      }
+    }
+    return(result)
+  }
+}
+
 x <- seq(-5, 5, len=200) # whole simulation data uses 200 sample points equally separated within interval (-5, 5).
 
 # source of eigen functions.
@@ -614,12 +647,12 @@ RSQ.error <- function(fdata., label, n.repeat, K., max.order., deriv.method.="bs
                              pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1),
                                                       c(class1, class2)))[1:length(pi.hat)]
                              pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
-                             posterior <- c(0.5*mean(pi.hat.df$y == "2"))
+                             posterior <- c(0.5*mean(pi.hat.df$y == class2))
                              for (j in 1:(nrow(pi.hat.df)-1)) {
-                               posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == "1") + 0.5*mean(pi.hat.df$y[-(1:j)] == "2")
+                               posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == class1) + 0.5*mean(pi.hat.df$y[-(1:j)] == class2)
                                posterior <- c(posterior, posterior.j)
                              }
-                             posterior <- c(posterior, 0.5*mean(pi.hat.df$y == "1"))
+                             posterior <- c(posterior, 0.5*mean(pi.hat.df$y == class1))
                              
                              result.i <- data.frame(test.error=mean(pred != label[-train]), orders=best.order)
                              result.i$bayes.error <- 1 - max(posterior)
@@ -678,12 +711,12 @@ pda.score.error <- function(fdata., label, n.repeat, K., max.order., deriv.metho
                              pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
                              pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
                              
-                             posterior <- c(0.5*mean(pi.hat.df$y == "2"))
+                             posterior <- c(0.5*mean(pi.hat.df$y == class2))
                              for (j in 1:(nrow(pi.hat.df)-1)) {
-                               posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == "1") + 0.5*mean(pi.hat.df$y[-(1:j)] == "2")
+                               posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == class1) + 0.5*mean(pi.hat.df$y[-(1:j)] == class2)
                                posterior <- c(posterior, posterior.j)
                              }
-                             posterior <- c(posterior, 0.5*mean(pi.hat.df$y == "1"))
+                             posterior <- c(posterior, 0.5*mean(pi.hat.df$y == class1))
                              
                              result.i <- data.frame(test.error=mean(pred != label[-train]), orders=best.order)
                              result.i$bayes.error <- 1 - max(posterior)
@@ -722,12 +755,12 @@ fpc.score.error <- function(fdata., label, n.repeat, max.fpc, lam=1) {
                                pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
                                pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
                                
-                               posterior <- c(0.5*mean(pi.hat.df$y == "2"))
+                               posterior <- c(0.5*mean(pi.hat.df$y == class2))
                                for (j in 1:(nrow(pi.hat.df)-1)) {
-                                 posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == "1") + 0.5*mean(pi.hat.df$y[-(1:j)] == "2")
+                                 posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == class1) + 0.5*mean(pi.hat.df$y[-(1:j)] == class2)
                                  posterior <- c(posterior, posterior.j)
                                }
-                               posterior <- c(posterior, 0.5*mean(pi.hat.df$y == "1"))
+                               posterior <- c(posterior, 0.5*mean(pi.hat.df$y == class1))
                                
                                result.i <- data.frame(test.error=mean(pred != label[-train]), bayes.error=1 - max(posterior))
                                return(result.i)
@@ -943,5 +976,57 @@ for (i in 1:nrow(simul.params)){
   data2.fd <- fdata(data2, argvals=x)
   data.set7.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
 }
-plot.fdata(data1.fd)
-plot.fdata(data2.fd)
+
+# data set8.
+data.set8.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(100)
+  data1 <- simul.data(list(cos1), 100, mu.i+1, error=err.i, covariance=err.cov)
+  data1 <- data1 + simul.data(list(cos3), 100, 3*(mu.i+1), error=err.i, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(cos1), 100, 3*(mu.i+1), error=err.i, covariance=err.cov)
+  data2 <- data2 + simul.data(list(cos3), 100, mu.i+1, error=err.i, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  data.set8.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
+
+library(stringr)
+i <- 1
+for (scenario in names(data.set1.list)[1:4]) {
+  b <- simul.params[i, 1]
+  mu <- simul.params[i, 2]
+  pdf(str_interp("data plot (mu=${mu}, b=${b}).pdf"), width=14, height=4)
+  par(mfcol=c(2, 5), mar=c(2, 2, 2, 2))
+  plot.fdata(data.set1.list[[scenario]]$data1.fd, main="Simulation I (Group 1)")
+  plot.fdata(data.set1.list[[scenario]]$data2.fd, main="Simulation I (Group 2)")
+  
+  plot.fdata(data.set6.list[[scenario]]$data1.fd, main="Simulation II (Group 1)")
+  plot.fdata(data.set6.list[[scenario]]$data2.fd, main="Simulation II (Group 2)")
+  
+  plot.fdata(data.set3.list[[scenario]]$data1.fd, main="Simulation III (Group 1)")
+  plot.fdata(data.set3.list[[scenario]]$data2.fd, main="Simulation III (Group 2)")
+  
+  plot.fdata(data.set5.list[[scenario]]$data1.fd, main="Simulation IV (Group 1)")
+  plot.fdata(data.set5.list[[scenario]]$data2.fd, main="Simulation IV (Group 2)")
+  
+  plot.fdata(data.set7.list[[scenario]]$data1.fd, main="Simulation V (Group 1)")
+  plot.fdata(data.set7.list[[scenario]]$data2.fd, main="Simulation V (Group 2)")
+  dev.off()
+  par(mfcol=c(1,1))
+  i <- i + 1
+}
