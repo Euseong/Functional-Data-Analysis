@@ -1,3 +1,6 @@
+library(fda)
+library(fda.usc)
+library(dplyr)
 # pda after smoothing
 gene <- read.csv("yeast_with_label.csv")
 gene <- na.omit(gene[, c(2, 7:24, 80)])
@@ -73,21 +76,21 @@ data.set.smoothed <- gene.bs.smooth
 data.set.smoothed <- gene.f.smooth
 
 {set.seed(100)
-set.sm.RSQ.error <- RSQ.cv.error(data.set.smoothed, label.sm, K=10, max.order=11, deriv.method="bspline", nbasis=12)
-set.sm.pda.error <- pda.score.cv.error(data.set.smoothed, label.sm, K=10, max.order=11, deriv.method="bspline", nbasis=12)
-set.sm.fpc.error <- fpc.score.cv.error(data.set.smoothed, label.sm, K=10, max.fpc=11)
-set.bsm.result0.rt <- cbind(rbind(rbind(set.sm.RSQ.error[,-3], set.sm.pda.error[,-3]), set.sm.fpc.error),
-                            max.fpc=c(set.sm.RSQ.error[,3], set.sm.pda.error[,3], 1:11), stringsAsFactors=F)}
+  set.sm.RSQ.error <- RSQ.cv.error(data.set.smoothed, label.sm, K=10, max.order=11, deriv.method="bspline", nbasis=12)
+  set.sm.pda.error <- pda.score.cv.error(data.set.smoothed, label.sm, K=10, max.order=11, deriv.method="bspline", nbasis=12)
+  set.sm.fpc.error <- fpc.score.cv.error(data.set.smoothed, label.sm, K=10, max.fpc=11)
+  set.bsm.result0.rt <- cbind(rbind(rbind(set.sm.RSQ.error[,-3], set.sm.pda.error[,-3]), set.sm.fpc.error),
+                              max.fpc=c(set.sm.RSQ.error[,3], set.sm.pda.error[,3], 1:11), stringsAsFactors=F)}
 
 {set.seed(100)
-set.sm.RSQ.error <- RSQ.cv.error(data.set.smoothed, label.sm, K=10, max.order=11, deriv.method="fourier", nbasis=12)
-set.sm.pda.error <- pda.score.cv.error(data.set.smoothed, label.sm, K=10, max.order=11, deriv.method="fourier", nbasis=12)
-set.fsm.result0.rt <- cbind(rbind(rbind(set.sm.RSQ.error[,-3], set.sm.pda.error[,-3]), set.sm.fpc.error),
-                            max.fpc=c(set.sm.RSQ.error[,3], set.sm.pda.error[,3], 1:11), stringsAsFactors=F)
-set.sm.result0.rt <- cbind(paste(round(set.bsm.result0.rt[,1], 2), " (", round(set.bsm.result0.rt[,2], 2), ")", sep=""), set.bsm.result0.rt[,3],
-                           paste(round(set.fsm.result0.rt[,1], 2), " (", round(set.fsm.result0.rt[,2], 2), ")", sep=""), set.fsm.result0.rt[,3])
-row.names(set.sm.result0.rt) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA", 11), as.character(1:11), sep=""))
-xtable(set.sm.result0.rt)}
+  set.sm.RSQ.error <- RSQ.cv.error(data.set.smoothed, label.sm, K=10, max.order=11, deriv.method="fourier", nbasis=12)
+  set.sm.pda.error <- pda.score.cv.error(data.set.smoothed, label.sm, K=10, max.order=11, deriv.method="fourier", nbasis=12)
+  set.fsm.result0.rt <- cbind(rbind(rbind(set.sm.RSQ.error[,-3], set.sm.pda.error[,-3]), set.sm.fpc.error),
+                              max.fpc=c(set.sm.RSQ.error[,3], set.sm.pda.error[,3], 1:11), stringsAsFactors=F)
+  set.sm.result0.rt <- cbind(paste(round(set.bsm.result0.rt[,1], 2), " (", round(set.bsm.result0.rt[,2], 2), ")", sep=""), set.bsm.result0.rt[,3],
+                             paste(round(set.fsm.result0.rt[,1], 2), " (", round(set.fsm.result0.rt[,2], 2), ")", sep=""), set.fsm.result0.rt[,3])
+  row.names(set.sm.result0.rt) <- c("PDA(RSQ)", "& & PDA(scores)", paste(rep("& & FPCA", 11), as.character(1:11), sep=""))
+  xtable(set.sm.result0.rt)}
 
 # raw.RSQ.order1 <- RSQ.cv.order(train.fdata, label=gene$Peak[train], K=nfold, max.order=10, deriv.method="bspline", s.basis=bs.basis, nbasis=65)
 # bs.RSQ.order1 <- RSQ.cv.order(train.fdata, label=gene$Peak[train], K=nfold, max.order=10, deriv.method="bspline", s.basis=bs.basis, nbasis=65)
@@ -141,3 +144,129 @@ for (data.set.smoothed in list(gene.fdata, gene.bs.smooth, gene.f.smooth)) {
 }
 saveRDS(results.list, file=paste0("gene", " classification results.RData", sep=""))
 
+
+## pda analysis
+n <- nrow(gene)
+label <- gene$Peak
+input.data <- gene.fdata
+input.data <- gene.bs.smooth
+input.data <- gene.f.smooth
+
+pdf(file = paste0('pda simulation results/image/gene', '.pdf'), width=6, height=5)
+plot.fdata(input.data, col=ifelse(label=="G1", 1, 8), main=NULL, xlab="min", ylab="gene expression", ylim=c(-2, 3))
+legend("topright", c("G1", "non_g1"), col=c("black", "gray"), lty=c(1,1), cex=0.7)
+dev.off()
+set.seed(100)
+train <- sample(1:n, round(n*0.8))
+gene.train <- input.data
+gene.train$data <- input.data$data[train,]
+gene.test <- input.data
+gene.test$data <- input.data$data[-train,]
+n.test <- n - length(train)
+class1 <- levels(label)[1]
+class2 <- levels(label)[2]
+
+  # PDA RSQ
+train.class1 <- gene.train
+train.class2 <- gene.train
+train.class1$data <- gene.train$data[which(label[train] == class1),]
+train.class2$data <- gene.train$data[which(label[train] == class2),]
+
+class1.beta <- get.pw.const.beta(train.class1, m=3, method="fourier", n.basis=12)
+class2.beta <- get.pw.const.beta(train.class2, m=3, method="fourier", n.basis=12)
+
+class1.RSQ <- get.RSQ(input.data, class1.beta, method="fourier", n.basis=12)
+class2.RSQ <- get.RSQ(input.data, class2.beta, method="fourier", n.basis=12)
+RSQ.df <- data.frame(class1=class1.RSQ, class2=class2.RSQ, y=label)
+
+logistic.fit <- glm(y~., data=RSQ.df[train,], family=binomial)
+pi.hat <- predict(logistic.fit, newdata=RSQ.df[-train,], type="response")
+pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1),
+                         c(class1, class2)))[1:n.test]
+false.index <- which(pred != label[-train])
+pred[pred != label[-train]]
+RSQ.fasle.nonG1 <- gene.test
+RSQ.fasle.nonG1$data <- gene.test$data[false.index,][pred[false.index]=="non_G1",]
+RSQ.fasle.G1 <- gene.test
+RSQ.fasle.G1$data <- gene.test$data[false.index,][pred[false.index]=="G1",]
+
+mean(pred != label[-train])
+sum(pred == "non_G1")
+sum(pred == "G1")
+
+  # PDA scores
+coefs <- get.pw.const.beta(gene.train, m=10, method="fourier", n.basis=12)
+psi.list <- get.psi(coefs, gene.train$argvals)
+
+mean.curve <- apply(gene.train$data, 2, mean)
+diff <- as.matrix(input.data$data) - matrix(mean.curve, nrow=n, ncol=length(mean.curve), byrow=T)
+scores <- list()
+scores[["y"]] <- label
+for (j in 1:length(psi.list)) {
+  scores.i <- diff %*% matrix(psi.list[[j]], ncol=1)
+  scores.i <- ifelse(is.infinite(scores.i), .Machine$double.xmax, scores.i)
+  scores.i <- ifelse(is.nan(scores.i), .Machine$double.xmin, scores.i)
+  scores[[as.character(j)]] <- scores.i
+}
+scores <- as.data.frame(scores)
+
+logistic.fit <- glm(y~., data=scores[train,], family=binomial)
+pi.hat <- predict(logistic.fit, newdata=scores[-train,], type="response")
+pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
+false.index <- which(pred != label[-train])
+pred[pred != label[-train]]
+score.fasle.nonG1 <- gene.test
+score.fasle.nonG1$data <- gene.test$data[false.index,][pred[false.index]=="non_G1",]
+score.fasle.G1 <- gene.test
+score.fasle.G1$data <- gene.test$data[false.index,][pred[false.index]=="G1",]
+
+mean(pred != label[-train])
+sum(pred == "non_G1")
+sum(pred == "G1")
+
+
+  # FPCA
+train.fpca <- create.pc.basis(gene.train, l=1:5)
+scores <- get.fpc.score(input.data, train.fpca)
+scores$y <- label
+
+logistic.fit <- glm(y~., data=scores[train,], family=binomial)
+pi.hat <- predict(logistic.fit, newdata=scores[-train,], type="response")
+pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
+false.index <- which(pred != label[-train])
+pred[pred != label[-train]]
+FPC.fasle.nonG1 <- gene.test
+FPC.fasle.nonG1$data <- gene.test$data[false.index,][pred[false.index]=="non_G1",]
+FPC.fasle.G1 <- gene.test
+FPC.fasle.G1$data <- gene.test$data[false.index,][pred[false.index]=="G1",]
+
+mean(pred != label[-train])
+sum(pred == "non_G1")
+sum(pred == "G1")
+
+
+pdf(file = paste0('pda simulation results/image/geneMisclass', '.pdf'), width=11, height=12)
+par(mfrow=c(3,2))
+
+plot.fdata(gene.test, col=ifelse(label[-train]=="G1", 1, 8), main="PDA RSQ", xlab="min", ylab="gene expression", ylim=c(-2,3))
+lines(RSQ.fasle.nonG1, type="l", col="red", lwd=2)
+legend("topright", c("misclassified as G1", "G1", "non_g1"), col=c("red","black", "gray"), lty=c(1,1), cex=1)
+plot.fdata(gene.test, col=ifelse(label[-train]=="G1", 1, 8), main="PDA RSQ", xlab="min", ylab="gene expression", ylim=c(-2,3))
+lines(RSQ.fasle.G1, type="l", col="blue", lwd=2)
+legend("topright", c("misclassified as non_G1", "G1", "non_g1"), col=c("blue","black", "gray"), lty=c(1,1), cex=1)
+
+plot.fdata(gene.test, col=ifelse(label[-train]=="G1", 1, 8), main="PDA scores", xlab="min", ylab="gene expression", ylim=c(-2,3))
+lines(score.fasle.nonG1, type="l", col="red", lwd=2)
+legend("topright", c("misclassified as G1", "G1", "non_g1"), col=c("red","black", "gray"), lty=c(1,1), cex=1)
+plot.fdata(gene.test, col=ifelse(label[-train]=="G1", 1, 8), main="PDA scores", xlab="min", ylab="gene expression", ylim=c(-2,3))
+lines(score.fasle.G1, type="l", col="blue", lwd=2)
+legend("topright", c("misclassified as non_G1", "G1", "non_g1"), col=c("blue","black", "gray"), lty=c(1,1), cex=1)
+
+plot.fdata(gene.test, col=ifelse(label[-train]=="G1", 1, 8), main="FPC scores", xlab="min", ylab="gene expression", ylim=c(-2,3))
+lines(FPC.fasle.nonG1, type="l", col="red", lwd=2)
+legend("topright", c("misclassified as G1", "G1", "non_g1"), col=c("red","black", "gray"), lty=c(1,1), cex=1)
+plot.fdata(gene.test, col=ifelse(label[-train]=="G1", 1, 8), main="FPC scores", xlab="min", ylab="gene expression", ylim=c(-2,3))
+lines(FPC.fasle.G1, type="l", col="blue", lwd=2)
+legend("topright", c("misclassified as non_G1", "G1", "non_g1"), col=c("blue","black", "gray"), lty=c(1,1), cex=1)
+par(mfrow=c(1,1))
+dev.off()
