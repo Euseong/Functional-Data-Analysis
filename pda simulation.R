@@ -586,9 +586,9 @@ pda.score.cv.order <- function(fdata., label, K, max.order, deriv.method="bsplin
                                     scores <- list()
                                     scores[["y"]] <- label
                                     for (j in 1:length(psi.list)) {
-                                      scores.i <- diff %*% matrix(psi.list[[j]], ncol=1)
+                                      scores.i <- round(diff %*% matrix(psi.list[[j]], ncol=1), 3)
                                       scores.i <- ifelse(is.infinite(scores.i), .Machine$double.xmax, scores.i)
-                                      scores.i <- ifelse(is.nan(scores.i), .Machine$double.xmin, scores.i)
+                                      scores.i <- ifelse(is.nan(scores.i), 0, scores.i)
                                       scores[[as.character(j)]] <- scores.i
                                     }
                                     scores <- as.data.frame(scores)
@@ -646,7 +646,7 @@ RSQ.error <- function(fdata., label, n.repeat, K., max.order., deriv.method.="bs
                              pi.hat <- predict(logistic.fit, newdata=RSQ.df[-train,], type="response")
                              pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1),
                                                       c(class1, class2)))[1:length(pi.hat)]
-                             pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
+                             pi.hat.df <- data.frame(pi.hat=pi.hat, y=RSQ.df$y[-train]) %>% arrange(pi.hat)
                              posterior <- c(0.5*mean(pi.hat.df$y == class2))
                              for (j in 1:(nrow(pi.hat.df)-1)) {
                                posterior.j <- 0.5*mean(pi.hat.df$y[1:j] == class1) + 0.5*mean(pi.hat.df$y[-(1:j)] == class2)
@@ -698,9 +698,9 @@ pda.score.error <- function(fdata., label, n.repeat, K., max.order., deriv.metho
                              scores <- list()
                              scores[["y"]] <- label
                              for (j in 1:length(psi.list)) {
-                               scores.i <- diff %*% matrix(psi.list[[j]], ncol=1)
+                               scores.i <- round(diff %*% matrix(psi.list[[j]], ncol=1), 3)
                                scores.i <- ifelse(is.infinite(scores.i), .Machine$double.xmax, scores.i)
-                               scores.i <- ifelse(is.nan(scores.i), .Machine$double.xmin, scores.i)
+                               scores.i <- ifelse(is.nan(scores.i), 0, scores.i)
                                scores[[as.character(j)]] <- scores.i
                              }
                              scores <- as.data.frame(scores)
@@ -709,7 +709,7 @@ pda.score.error <- function(fdata., label, n.repeat, K., max.order., deriv.metho
                              logistic.fit <- glm(y~., data=scores[train,], family=binomial)
                              pi.hat <- predict(logistic.fit, newdata=scores[-train,], type="response")
                              pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
-                             pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
+                             pi.hat.df <- data.frame(pi.hat=pi.hat, y=scores$y[-train]) %>% arrange(pi.hat)
                              
                              posterior <- c(0.5*mean(pi.hat.df$y == class2))
                              for (j in 1:(nrow(pi.hat.df)-1)) {
@@ -753,7 +753,7 @@ fpc.score.error <- function(fdata., label, n.repeat, max.fpc, lam=1) {
                                logistic.fit <- glm(y~., data=scores[train,], family=binomial)
                                pi.hat <- predict(logistic.fit, newdata=scores[-train,], type="response")
                                pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1), c(class1, class2)))[1:n.test]
-                               pi.hat.df <- data.frame(pi.hat=logistic.fit$fitted.values, y=logistic.fit$data$y) %>% arrange(pi.hat)
+                               pi.hat.df <- data.frame(pi.hat=pi.hat, y=scores$y[-train]) %>% arrange(pi.hat)
                                
                                posterior <- c(0.5*mean(pi.hat.df$y == class2))
                                for (j in 1:(nrow(pi.hat.df)-1)) {
@@ -944,12 +944,16 @@ for (i in 1:nrow(simul.params)){
   
   
   set.seed(100)
-  data1 <- simul.data(list(cos1+0.1*exp1), 100, mu.i, error=err.i, covariance=err.cov)
+  data1 <- simul.data(list(cos1), 100, mu.i+1, error=err.i, covariance=err.cov)
   data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(sin1+0.1*exp1), 100, mu.i, error=err.i, covariance=err.cov)
+  data2 <- simul.data(list(sin1), 100, mu.i+1, error=err.i, covariance=err.cov)
   data2.fd <- fdata(data2, argvals=x)
   data.set6.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
 }
+{par(mfrow=c(2,1))
+plot.fdata(data.set6.list$`1-th-0.1-0-0`$data1.fd, main="Simulation II (Group 1)")
+plot.fdata(data.set6.list$`1-th-0.1-0-0`$data2.fd, main="Simulation II (Group 2)")
+par(mfrow=c(1,1))}
 
 # data set7.
 data.set7.list <- list()
