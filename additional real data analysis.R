@@ -173,3 +173,33 @@ for (data.set.smoothed in list(growth.fdata, growth.bs.smooth, growth.f.smooth))
   print(Sys.time())
 }
 saveRDS(results.list, file=paste0("growth", " classification results.RData", sep=""))
+
+
+# tecator data
+data(tecator)
+tecator.fd <- tecator$absorp.fdata
+high.fat <- as.factor(ifelse(tecator$y$Fat > 20, "high", "low"))
+plot.fdata(tecator$absorp.fdata, col=ifelse(high.fat=="high", 1, 2))
+
+basis.length <- round(0.5*length(tecator.fd$argvals)) # number of B-spline basis.
+bs.basis <- create.bspline.basis(tecator.fd$rangeval, basis.length)
+f.basis <- create.fourier.basis(tecator.fd$rangeval, 31)
+gcv.mat <- matrix(0, 1, 2)
+gcv.search <- function(lam, fdata., basis){
+  gcv <- smooth.basisPar(argvals=fdata.$argvals, y=t(fdata.$data), fdobj=basis, lambda=lam)$gcv
+  return(c(lam, basis$nbasis, mean(gcv)))
+}
+
+lambdas <- 10^(-5:3)
+gcv.result1 <- as.data.frame(t(sapply(lambdas, gcv.search, fdata.=tecator.fd, basis=bs.basis)))
+colnames(gcv.result1) <- c("lambda", "n.basis", "gcv")
+gcv.lambda1 <- gcv.result1$lambda[which.min(gcv.result1$gcv)]
+
+gcv.result2 <- data.frame(t(sapply(lambdas, gcv.search, fdata.=tecator.fd, basis=f.basis)))
+colnames(gcv.result2) <- c("lambda", "n.basis", "gcv")
+gcv.lambda2 <- gcv.result2$lambda[which.min(gcv.result2$gcv)]
+
+tecator.bs.smooth <- smooth.fdata(tecator.fd, basis=bs.basis, lambda=gcv.lambda1)
+tecator.f.smooth <- smooth.fdata(tecator.fd, basis=f.basis, lambda=gcv.lambda2)
+plot.fdata(tecator.bs.smooth, col=1)
+plot.fdata(tecator.f.smooth, col=1)
