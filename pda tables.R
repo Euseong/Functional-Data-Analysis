@@ -30,14 +30,14 @@ gcv.search <- function(lam, fdata., basis){
 
 
 ## 
-# data set 3
-data.set.list <- data.set3.list
-data.set.num <- 3
+# data set 1
+data.set.list <- data.set1.list
+data.set.num <- 1
 results.list <- list()
 path <- paste0(working.dir, "/data set", data.set.num, " tables.txt")
 scenario.num <- 1
 start.time <- Sys.time()
-for (data.set.i in data.set.list) {
+for (data.set.i in data.set.list[1:7]) {
   data1.fd <- data.set.i$data1.fd
   data2.fd <- data.set.i$data2.fd
   params.i <- simul.params[scenario.num,]
@@ -136,7 +136,7 @@ data.set.num <- 5
 path <- paste0(working.dir, "/data set", data.set.num, " tables.txt")
 scenario.num <- 1
 start.time <- Sys.time()
-for (data.set.i in data.set.list) {
+for (data.set.i in data.set.list[8:28]) {
   data1.fd <- data.set.i$data1.fd
   data2.fd <- data.set.i$data2.fd
   params.i <- simul.params[scenario.num,]
@@ -223,7 +223,7 @@ for (data.set.i in data.set.list) {
   print(data.set.i.results, file = path, compress = FALSE, append=is.append)
   # print(bayes.error, file = path, compress = FALSE, append=T)
   print(paste0(scenario.num, "th scenario over"))
-  scenario.num <- scenario.num + 1
+  scenario.num <- scenario.num +  1
 }
 saveRDS(results.list, file=paste0(working.dir, "/data set", data.set.num, " results.RData", sep=""))
 paste("start :", start.time, "end :", Sys.time())
