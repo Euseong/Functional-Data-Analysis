@@ -4,6 +4,8 @@ library(dplyr)
 library(MASS)
 library(reshape2)
 library(CVTuningCov)
+library(e1071)
+library(class)
 
 # To differentiate more than 4 times, functions fdata2fd and fdata.deriv in fda.usc package are modified.
 fdata2fd <- function (fdataobj, type.basis = NULL, nbasis = NULL, nderiv = 0, 
@@ -439,10 +441,6 @@ x <- seq(-5, 5, len=200) # whole simulation data uses 200 sample points equally 
   plot.fdata(data2.fd, col=1:5, main=NULL)}
 par(mfrow=c(1,1))
 
-library(doParallel)
-nc <- detectCores()
-registerDoParallel(nc-1)
-
 
 # PDA after smoothing.
 smooth.fdata <- function(fdata., basis, lambda, argvals.=NULL) {
@@ -646,6 +644,8 @@ RSQ.error <- function(fdata., label, n.repeat, K., max.order., deriv.method.="bs
                              pi.hat <- predict(logistic.fit, newdata=RSQ.df[-train,], type="response")
                              pred <- as.factor(append(ifelse(pi.hat > 0.5, class2, class1),
                                                       c(class1, class2)))[1:length(pi.hat)]
+                             
+                             # calculate Bayes error by Bayes classifier with pi_hat
                              pi.hat.df <- data.frame(pi.hat=pi.hat, y=RSQ.df$y[-train]) %>% arrange(pi.hat)
                              posterior <- c(0.5*mean(pi.hat.df$y == class2))
                              for (j in 1:(nrow(pi.hat.df)-1)) {
@@ -653,9 +653,12 @@ RSQ.error <- function(fdata., label, n.repeat, K., max.order., deriv.method.="bs
                                posterior <- c(posterior, posterior.j)
                              }
                              posterior <- c(posterior, 0.5*mean(pi.hat.df$y == class1))
+                             # NB.fit <- naiveBayes(y~.,, data=RSQ.df[train,])
+                             # bayes.error <- mean(predict(NB.fit, newdata=RSQ.df[-train,]) != RSQ.df[-train,]$y)
                              
                              result.i <- data.frame(test.error=mean(pred != label[-train]), orders=best.order)
                              result.i$bayes.error <- 1 - max(posterior)
+                             # result.i$bayes.error <- bayes.error
                              return(result.i)
                            }
   result <- as.data.frame(apply(t(sapply(test.results, cbind)), 2, unlist))
@@ -817,7 +820,212 @@ for (i in 1:nrow(simul.params)){
 }
 
 
-# data set2.
+# data set2(prev 3).
+data.set2.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(300)
+  data1 <- simul.data(list(exp0.25*cos1, exp0.25*sin1), 100, mu.i, error=err.i, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(exp0.5*cos3, exp0.5*sin3), 100, mu.i, error=err.i, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  data.set2.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
+
+
+# data set3(prev 5).
+data.set3.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(100)
+  data1 <- simul.data(list(x.poly3), 100, mu.i, error=err.i, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(3*cos3, 3*sin3), 100, mu.i, error=err.i, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  data.set3.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
+
+
+# data set4(prev 6).
+data.set4.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(100)
+  data1 <- simul.data(list(cos1), 100, mu.i+1, error=err.i, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(sin1), 100, mu.i+1, error=err.i, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  data.set4.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
+
+# data set5(prev 7).
+data.set5.list <- list()
+for (i in 1:nrow(simul.params)){
+  err.i <- simul.params$err[i]
+  mu.i <- simul.params$mu[i]
+  rho.i <- simul.params$rho[i]
+  
+  if (rho.i != 0) {
+    if(i < 17) {
+      err.cov <- matrix(rho.i, x.len, x.len)
+      diag(err.cov) <- 1
+      err.cov <- err.i*err.cov
+    } else if (i > 16){
+      err.cov <- err.i*AR1(x.len, rho=rho.i)
+    }
+  } else {err.cov <- 0}
+  
+  
+  set.seed(100)
+  data1 <- simul.data(list(cos1+0.1*exp1), 100, mu.i+1, error=err.i, covariance=err.cov)
+  data1.fd <- fdata(data1, argvals=x)
+  data2 <- simul.data(list(cos1+0.1*exp1), 100, -(mu.i+1), error=err.i, covariance=err.cov)
+  data2.fd <- fdata(data2, argvals=x)
+  data.set5.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
+}
+
+
+# Bayes error
+library(doParallel)
+library(xtable)
+library(stringr)
+working.dir <- "C:/Users/gkfrj/Documents/R"
+
+nc <- detectCores()
+registerDoParallel(nc-1)
+lambdas <- 10^(-5:3)
+nfold <- 8
+repeat.n <- 100
+basis.length <- round(0.5*length(x)) # number of B-spline basis.
+bs.basis <- create.bspline.basis(c(-5,5), basis.length)
+f.basis <- create.fourier.basis(c(-5,5), 11)
+gcv.mat <- matrix(0, 1, 2)
+gcv.search <- function(lam, fdata., basis){
+  gcv <- smooth.basisPar(argvals=fdata.$argvals, y=t(fdata.$data), fdobj=basis, lambda=lam)$gcv
+  return(c(lam, basis$nbasis, mean(gcv)))
+}
+
+data.set.list <- data.set5.list
+data.set.num <- 5
+results.list <- list()
+path <- paste0(working.dir, "/data set", data.set.num, " tables.txt")
+scenario.num <- 1
+bayes.error.df <- data.frame(ENN.lb=NA, ENN.ub=NA, E.BC=NA, E.BC.sd=NA)
+Sys.time()
+set.seed(10000)
+for (i in c(1:6, 8:9, 11:12, 14:15, 17:28)) {
+  data.set.i <- data.set.list[[i]]
+  data1.fd <- data.set.i$data1.fd
+  data2.fd <- data.set.i$data2.fd
+  
+  gcv.result1 <- as.data.frame(t(sapply(lambdas, gcv.search, fdata.=data1.fd, basis=bs.basis)))
+  colnames(gcv.result1) <- c("lambda", "n.basis", "gcv")
+  gcv.lambda1 <- gcv.result1$lambda[which.min(gcv.result1$gcv)]
+  gcv.result2 <- as.data.frame(t(sapply(lambdas, gcv.search, fdata.=data2.fd, basis=bs.basis)))
+  colnames(gcv.result2) <- c("lambda", "n.basis", "gcv")
+  gcv.lambda2 <- gcv.result2$lambda[which.min(gcv.result2$gcv)]
+  gcv.mat <- rbind(gcv.mat, c(gcv.lambda1, gcv.lambda2))
+  
+  data1.smooth <- smooth.fdata(data1.fd, basis=bs.basis, lambda=gcv.lambda1)
+  data2.smooth <- smooth.fdata(data2.fd, basis=bs.basis, lambda=gcv.lambda2)
+  set.seed(100)
+  index <- sample(200, 200)
+  data.set.smoothed <- fdata(rbind(data1.smooth$data, data2.smooth$data)[index,], argvals=x)
+  data.set.df <- as.data.frame(data.set.smoothed$data)
+  data.set.df$y <- as.factor(c(rep("1", 100), rep("2", 100))[index])
+  
+  n <- nrow(data.set.df)
+  train <- sample(1:n, round(0.8*n))
+  train.data <- data.set.df[train,]
+  knn.errors <- data.frame(error=NA, k=NA)
+  for (i in 1:repeat.n) {
+    n.train <- nrow(train.data)
+    folds <- (1:n.train)%%nfold + 1
+    folds <- sample(folds, n.train)
+    cv.errors <- c()
+    for (j in 1:nfold) {
+      knn.fit <- knn(train.data[folds != j, -ncol(train.data)], train.data[folds == j, -ncol(train.data)], train.data$y[folds != j], k=i)
+      cv.errors <- c(cv.errors, mean(knn.fit != train.data[folds == j,]$y))
+    }
+    knn.error.i <- mean(cv.errors)
+    result.i <- data.frame(error=knn.error.i, k=i)
+    knn.errors <- rbind(knn.errors, result.i)
+  }
+  knn.errors.df <- knn.errors[-1,]
+  k.cv <- knn.errors.df$k[which.min(knn.errors.df$error)]
+  
+  bayes.error.i <- matrix(0, 1, 2)
+  colnames(bayes.error.i) <- c("BC.error", "knn.error")
+  for (i in 1:repeat.n) {
+    train <- sample(1:n, round(0.8*n))
+    NB.fit <- naiveBayes(y~., data=data.set.df[train,])
+    BC.error.i <- mean(predict(NB.fit, newdata=data.set.df[-train,]) != data.set.df[-train,]$y)
+    
+    knn.fit <- knn(data.set.df[train, -ncol(data.set.df)], data.set.df[-train, -ncol(data.set.df)], data.set.df$y[train], k=k.cv)
+    knn.error.i <- mean(knn.fit != data.set.df[-train,]$y)
+    bayes.error.i <- rbind(bayes.error.i, c(BC.error.i, knn.error.i))
+  }
+  result <- as.data.frame(bayes.error.i[-1,])
+  E.BC <- mean(result$BC.error)
+  E.BC.sd <- sd(result$BC.error)
+  E.NN <- mean(result$knn.error)
+  bayes.error.df <- rbind(bayes.error.df, data.frame(ENN.lb=(1-sqrt(1-2*E.NN))/2, ENN.ub=E.NN, E.BC=E.BC, E.BC.sd=E.BC.sd))
+  
+  print(paste0(scenario.num, "th scenario over"))
+  scenario.num <- scenario.num + 1
+  print(Sys.time())
+}
+bayes.error.df <- bayes.error.df[-1,]
+bayes.error.df <- round(bayes.error.df, 2)
+bayes.error.tbl <- cbind( ENN.bound=paste("$",bayes.error.df$ENN.lb, "\\leq E_{Bayes} \\leq", bayes.error.df$ENN.ub, "$ &",
+                         E.BC=paste0(bayes.error.df$E.BC, " (", bayes.error.df$E.BC.sd, ") \\\\")))
+write(bayes.error.tbl[c(1,3,2,4, 5,7,9,11, 6,8,10,12, 13,16,19,22, 14,17,20,23, 15,18,21,24),],
+      paste0("data set", data.set.num, " Bayes errors.txt"))
+simul.params[c(1:6, 8:9, 11:12, 14:15, 17:28),][c(1,3,2,4, 5,7,9,11, 6,8,10,12, 13,16,19,22, 14,17,20,23, 15,18,21,24),]
+
+# data set(prev 2).
 data.set2.list <- list()
 for (i in 1:nrow(simul.params)){
   err.i <- simul.params$err[i]
@@ -844,34 +1052,7 @@ for (i in 1:nrow(simul.params)){
 }
 
 
-# data set3.
-data.set3.list <- list()
-for (i in 1:nrow(simul.params)){
-  err.i <- simul.params$err[i]
-  mu.i <- simul.params$mu[i]
-  rho.i <- simul.params$rho[i]
-  
-  if (rho.i != 0) {
-    if(i < 17) {
-      err.cov <- matrix(rho.i, x.len, x.len)
-      diag(err.cov) <- 1
-      err.cov <- err.i*err.cov
-    } else if (i > 16){
-      err.cov <- err.i*AR1(x.len, rho=rho.i)
-    }
-  } else {err.cov <- 0}
-  
-  
-  set.seed(300)
-  data1 <- simul.data(list(exp0.25*cos1, exp0.25*sin1), 100, mu.i, error=err.i, covariance=err.cov)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(exp0.5*cos3, exp0.5*sin3), 100, mu.i, error=err.i, covariance=err.cov)
-  data2.fd <- fdata(data2, argvals=x)
-  data.set3.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
-}
-
-
-# data set4.
+# data set(prev 4).
 data.set4.list <- list()
 for (i in 1:nrow(simul.params)){
   err.i <- simul.params$err[i]
@@ -898,90 +1079,7 @@ for (i in 1:nrow(simul.params)){
 }
 
 
-# data set5.
-data.set5.list <- list()
-for (i in 1:nrow(simul.params)){
-  err.i <- simul.params$err[i]
-  mu.i <- simul.params$mu[i]
-  rho.i <- simul.params$rho[i]
-  
-  if (rho.i != 0) {
-    if(i < 17) {
-      err.cov <- matrix(rho.i, x.len, x.len)
-      diag(err.cov) <- 1
-      err.cov <- err.i*err.cov
-    } else if (i > 16){
-      err.cov <- err.i*AR1(x.len, rho=rho.i)
-    }
-  } else {err.cov <- 0}
-  
-  
-  set.seed(100)
-  data1 <- simul.data(list(x.poly3), 100, mu.i, error=err.i, covariance=err.cov)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(3*cos3, 3*sin3), 100, mu.i, error=err.i, covariance=err.cov)
-  data2.fd <- fdata(data2, argvals=x)
-  data.set5.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
-}
-
-
-# data set6.
-data.set6.list <- list()
-for (i in 1:nrow(simul.params)){
-  err.i <- simul.params$err[i]
-  mu.i <- simul.params$mu[i]
-  rho.i <- simul.params$rho[i]
-  
-  if (rho.i != 0) {
-    if(i < 17) {
-      err.cov <- matrix(rho.i, x.len, x.len)
-      diag(err.cov) <- 1
-      err.cov <- err.i*err.cov
-    } else if (i > 16){
-      err.cov <- err.i*AR1(x.len, rho=rho.i)
-    }
-  } else {err.cov <- 0}
-  
-  
-  set.seed(100)
-  data1 <- simul.data(list(cos1), 100, mu.i+1, error=err.i, covariance=err.cov)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(sin1), 100, mu.i+1, error=err.i, covariance=err.cov)
-  data2.fd <- fdata(data2, argvals=x)
-  data.set6.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
-}
-{par(mfrow=c(2,1))
-plot.fdata(data.set6.list$`1-th-0.1-0-0`$data1.fd, main="Simulation II (Group 1)")
-plot.fdata(data.set6.list$`1-th-0.1-0-0`$data2.fd, main="Simulation II (Group 2)")
-par(mfrow=c(1,1))}
-
-# data set7.
-data.set7.list <- list()
-for (i in 1:nrow(simul.params)){
-  err.i <- simul.params$err[i]
-  mu.i <- simul.params$mu[i]
-  rho.i <- simul.params$rho[i]
-  
-  if (rho.i != 0) {
-    if(i < 17) {
-      err.cov <- matrix(rho.i, x.len, x.len)
-      diag(err.cov) <- 1
-      err.cov <- err.i*err.cov
-    } else if (i > 16){
-      err.cov <- err.i*AR1(x.len, rho=rho.i)
-    }
-  } else {err.cov <- 0}
-  
-  
-  set.seed(100)
-  data1 <- simul.data(list(cos1+0.1*exp1), 100, mu.i+1, error=err.i, covariance=err.cov)
-  data1.fd <- fdata(data1, argvals=x)
-  data2 <- simul.data(list(cos1+0.1*exp1), 100, -(mu.i+1), error=err.i, covariance=err.cov)
-  data2.fd <- fdata(data2, argvals=x)
-  data.set7.list[[paste(i, "th", err.i, mu.i, rho.i, sep="-")]] <- list(data1.fd=data1.fd, data2.fd=data2.fd)
-}
-
-# data set8.
+# data set(prev 8).
 data.set8.list <- list()
 for (i in 1:nrow(simul.params)){
   err.i <- simul.params$err[i]
